@@ -4,11 +4,11 @@ import requests
 import asyncio
 import os
 
-# ===== ENV VARIABLES =====
+# ===== ENV =====
 TOKEN = os.getenv("DISCORD_TOKEN")
 ALERT_CHANNEL_ID = int(os.getenv("ALERT_CHANNEL_ID"))
 
-# ===== DISCORD SETUP =====
+# ===== DISCORD =====
 intents = discord.Intents.default()
 intents.members = True
 
@@ -19,12 +19,12 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
 
-# ===== SEARCH URLS =====
+# ===== URLS =====
 WALMART_URL = "https://www.walmart.com/search?q=pokemon+cards"
 TARGET_URL = "https://www.target.com/s?searchTerm=pokemon+cards"
 BESTBUY_URL = "https://www.bestbuy.com/site/searchpage.jsp?st=pokemon+cards"
 
-# ===== STORE CHECKERS (RETAIL ONLY) =====
+# ===== CHECKERS =====
 def check_walmart():
     try:
         r = requests.get(WALMART_URL, headers=HEADERS, timeout=10)
@@ -35,8 +35,8 @@ def check_walmart():
 def check_target():
     try:
         r = requests.get(TARGET_URL, headers=HEADERS, timeout=10)
-        text = r.text.lower()
-        return "sold by target" in text and "out of stock" not in text
+        t = r.text.lower()
+        return "sold by target" in t and "out of stock" not in t
     except:
         return False
 
@@ -47,9 +47,17 @@ def check_bestbuy():
     except:
         return False
 
-# ===== SLASH COMMAND (ZIP CODE) =====
-@tree.command(name="zipcode", description="Set your ZIP code for Pokémon restock alerts")
+# ===== ZIP COMMAND (INSTANT RESPONSE) =====
+@tree.command(name="zipcode", description="Set your ZIP code for Pokémon alerts")
 async def zipcode(interaction: discord.Interaction, zip: str):
+
+    # ✅ RESPOND IMMEDIATELY — NO TIMEOUT POSSIBLE
+    await interaction.response.send_message(
+        f"✅ ZIP **{zip}** saved. You’ll get Pokémon restock alerts.",
+        ephemeral=True
+    )
+
+    # 🔧 DO ROLE WORK AFTER RESPONSE
     guild = interaction.guild
     role_name = f"ZIP-{zip}"
 
@@ -59,12 +67,7 @@ async def zipcode(interaction: discord.Interaction, zip: str):
 
     await interaction.user.add_roles(role)
 
-    await interaction.response.send_message(
-        f"✅ ZIP **{zip}** saved. You’ll get Pokémon restock alerts.",
-        ephemeral=True
-    )
-
-# ===== READY EVENT =====
+# ===== READY =====
 @client.event
 async def on_ready():
     try:
@@ -110,7 +113,7 @@ async def on_ready():
         except Exception as e:
             print("CHECK ERROR:", e)
 
-        await asyncio.sleep(300)  # check every 5 minutes
+        await asyncio.sleep(300)
 
-# ===== RUN BOT =====
+# ===== RUN =====
 client.run(TOKEN)
