@@ -5,36 +5,54 @@ from bs4 import BeautifulSoup
 import asyncio
 import os
 
+# ENV VARIABLES (Railway)
 TOKEN = os.getenv("DISCORD_TOKEN")
 ALERT_CHANNEL_ID = int(os.getenv("ALERT_CHANNEL_ID"))
 
+# DISCORD SETUP
 intents = discord.Intents.default()
 intents.members = True
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
-HEADERS = {"User-Agent": "Mozilla/5.0"}
+# HEADERS FOR REQUESTS
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
 
+# SEARCH URLS
 WALMART_URL = "https://www.walmart.com/search?q=pokemon+cards"
 TARGET_URL = "https://www.target.com/s?searchTerm=pokemon+cards"
 BESTBUY_URL = "https://www.bestbuy.com/site/searchpage.jsp?st=pokemon+cards"
 
+# STORE CHECKERS
 def check_walmart():
-    r = requests.get(WALMART_URL, headers=HEADERS)
-    return "Sold & shipped by Walmart" in r.text
+    try:
+        r = requests.get(WALMART_URL, headers=HEADERS, timeout=10)
+        return "Sold & shipped by Walmart" in r.text
+    except:
+        return False
 
 def check_target():
-    r = requests.get(TARGET_URL, headers=HEADERS)
-    text = r.text.lower()
-    return "out of stock" not in text
+    try:
+        r = requests.get(TARGET_URL, headers=HEADERS, timeout=10)
+        return "out of stock" not in r.text.lower()
+    except:
+        return False
 
 def check_bestbuy():
-    r = requests.get(BESTBUY_URL, headers=HEADERS)
-    return "Add to Cart" in r.text
+    try:
+        r = requests.get(BESTBUY_URL, headers=HEADERS, timeout=10)
+        return "Add to Cart" in r.text
+    except:
+        return False
 
-@tree.command(name="setzip", description="Set your ZIP code for restock alerts")
+# SLASH COMMAND — SET ZIP
+@tree.command(name="setzip", description="Set your ZIP code for Pokémon restock alerts")
 async def setzip(interaction: discord.Interaction, zip: str):
+    await interaction.response.defer(ephemeral=True)
+
     guild = interaction.guild
     role_name = f"ZIP-{zip}"
 
@@ -43,17 +61,27 @@ async def setzip(interaction: discord.Interaction, zip: str):
         role = await guild.create_role(name=role_name)
 
     await interaction.user.add_roles(role)
-    await interaction.response.send_message(
-        f"✅ ZIP set to **{zip}**. You’ll get alerts for this area.",
+
+    await interaction.followup.send(
+        f"✅ ZIP set to **{zip}**. You’ll receive Pokémon restock alerts.",
         ephemeral=True
     )
 
+# BOT READY EVENT
 @client.event
 async def on_ready():
     await tree.sync()
     print("🟢 Restock Radar Bot Online")
 
     channel = client.get_channel(ALERT_CHANNEL_ID)
+    await channel.send(
+        "🟢 **Restock Radar LIVE**\n"
+        "Tracking Pokémon cards at:\n"
+        "• Walmart (Sold by Walmart only)\n"
+        "• Target\n"
+        "• Best Buy\n\n"
+        "Use `/setzip 12345` to get alerts."
+    )
 
     while True:
         try:
@@ -87,6 +115,7 @@ async def on_ready():
         except Exception as e:
             print("Error:", e)
 
-        await asyncio.sleep(300)  # check every 5 min
+        await asyncio.sleep(300)  # check every 5 minutes
 
+# RUN BOT
 client.run(TOKEN)
