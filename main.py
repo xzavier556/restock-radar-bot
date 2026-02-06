@@ -1,40 +1,44 @@
-import os
 import discord
-from discord.ext import tasks
 import requests
+from bs4 import BeautifulSoup
+import asyncio
+import os
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("ALERT_CHANNEL_ID"))
+ALERT_CHANNEL_ID = int(os.getenv("ALERT_CHANNEL_ID"))
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
-last_status = None
+WALMART_URL = "https://www.walmart.com/ip/353444924"  # example Pokémon item
+
+def check_walmart():
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+    r = requests.get(WALMART_URL, headers=headers)
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    if "Out of stock" in soup.text:
+        return False
+    return True
 
 @client.event
 async def on_ready():
-    print(f"Logged in as {client.user}")
-    check_stock.start()
+    print("Bot online")
+    channel = client.get_channel(ALERT_CHANNEL_ID)
 
-@tasks.loop(minutes=5)
-async def check_stock():
-    global last_status
+    while True:
+        try:
+            in_stock = check_walmart()
+            if in_stock:
+                await channel.send("🚨 **WALMART RESTOCK ALERT** 🚨\nPokémon cards are IN STOCK!")
+                await asyncio.sleep(1800)  # cooldown 30 min
+            else:
+                print("Still out of stock")
+        except Exception as e:
+            print(e)
 
-    url = "https://www.target.com/p/pokemon-trading-card-game-scarlet-violet-elite-trainer-box/-/A-89444908"
-    response = requests.get(url)
-    in_stock = "Out of stock" not in response.text
-
-    if last_status is None:
-        last_status = in_stock
-        return
-
-    if in_stock != last_status:
-        channel = client.get_channel(CHANNEL_ID)
-        if channel:
-            status = "🟢 IN STOCK" if in_stock else "🔴 OUT OF STOCK"
-            await channel.send(
-                f"🚨 **Target Pokémon ETB Update**\n{status}\nCheck fast 👀"
-            )
-        last_status = in_stock
+        await asyncio.sleep(300)  # check every 5 min
 
 client.run(TOKEN)
